@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as Babel from "@babel/standalone";
 
 const API_URL =
@@ -324,9 +324,55 @@ export default function GeneratedCodePreview({
   const [isValidating, setIsValidating] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
 
+  // Track the active backend request.
+  const activeControllerRef = useRef(null);
+
+  // Prevent state updates after component unmount.
+  const isMountedRef = useRef(false);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+
+    return () => {
+      isMountedRef.current = false;
+
+      activeControllerRef.current?.abort();
+      activeControllerRef.current = null;
+    };
+  }, []);
+
   // STEP 1: Validate and compile generated JSX.
-  async function compileAndPreview(sourceToCompile = source) {
+  async function compileAndPreview(
+    sourceToCompile = source,
+    options = {}
+  ) {
     if (isValidating) {
+      return false;
+    }
+
+    const externalSignal = options.signal;
+
+    // Manual validation owns its controller.
+    // AI generation supplies its existing controller signal.
+    const controller = externalSignal
+      ? null
+      : new AbortController();
+
+    const requestSignal =
+      externalSignal || controller.signal;
+
+    if (controller) {
+      activeControllerRef.current = controller;
+    }
+
+    if (requestSignal.aborted || !isMountedRef.current) {
+      if (
+        controller &&
+        activeControllerRef.current === controller
+      ) {
+        activeControllerRef.current = null;
+      }
+
       return false;
     }
 
@@ -356,10 +402,19 @@ export default function GeneratedCodePreview({
           body: JSON.stringify({
             source: sourceToCompile,
           }),
+          signal: requestSignal,
         }
       );
 
+      if (requestSignal.aborted || !isMountedRef.current) {
+        return false;
+      }
+
       const validationResult = await response.json();
+
+      if (requestSignal.aborted || !isMountedRef.current) {
+        return false;
+      }
 
       if (!response.ok || validationResult.valid !== true) {
         const issues = Array.isArray(validationResult.issues)
@@ -392,6 +447,10 @@ export default function GeneratedCodePreview({
         ],
       });
 
+      if (requestSignal.aborted || !isMountedRef.current) {
+        return false;
+      }
+
       if (!result.code) {
         throw new Error("Babel did not produce compiled code.");
       }
@@ -406,6 +465,14 @@ export default function GeneratedCodePreview({
 
       return true;
     } catch (compileError) {
+      if (
+        requestSignal.aborted ||
+        compileError.name === "AbortError" ||
+        !isMountedRef.current
+      ) {
+        return false;
+      }
+
       setPreviewDocument("");
 
       setError(
@@ -417,7 +484,15 @@ export default function GeneratedCodePreview({
 
       return false;
     } finally {
-      setIsValidating(false);
+      if (controller) {
+        if (activeControllerRef.current === controller) {
+          activeControllerRef.current = null;
+        }
+      }
+
+      if (isMountedRef.current) {
+        setIsValidating(false);
+      }
     }
   }
 
@@ -428,6 +503,10 @@ export default function GeneratedCodePreview({
     }
 
     const previousSource = source;
+
+    const controller = new AbortController();
+
+    activeControllerRef.current = controller;
 
     let generatedSource = "";
     let buffer = "";
@@ -448,8 +527,13 @@ export default function GeneratedCodePreview({
             Accept: "application/x-ndjson",
           },
           body: JSON.stringify({}),
+          signal: controller.signal,
         }
       );
+
+      if (controller.signal.aborted || !isMountedRef.current) {
+        return;
+      }
 
       if (!response.ok) {
         throw new Error(
@@ -502,8 +586,13 @@ export default function GeneratedCodePreview({
             );
           }
 
-          // Display the incoming source progressively.
-          setSource(generatedSource);
+          // Display incoming source progressively.
+          if (
+            isMountedRef.current &&
+            !controller.signal.aborted
+          ) {
+            setSource(generatedSource);
+          }
 
           return;
         }
@@ -522,10 +611,24 @@ export default function GeneratedCodePreview({
 
       // Read the stream until the server closes it.
       while (true) {
+        if (
+          controller.signal.aborted ||
+          !isMountedRef.current
+        ) {
+          return;
+        }
+
         const { value, done } = await reader.read();
 
         if (done) {
           break;
+        }
+
+        if (
+          controller.signal.aborted ||
+          !isMountedRef.current
+        ) {
+          return;
         }
 
         buffer += decoder.decode(value, {
@@ -547,6 +650,13 @@ export default function GeneratedCodePreview({
 
       if (buffer.trim()) {
         processEventLine(buffer);
+      }
+
+      if (
+        controller.signal.aborted ||
+        !isMountedRef.current
+      ) {
+        return;
       }
 
       if (!completionEvent) {
@@ -584,7 +694,16 @@ export default function GeneratedCodePreview({
 
       // STEP 3: Validate, compile and preview the complete source.
       const previewSuccessful =
-        await compileAndPreview(generatedSource);
+        await compileAndPreview(generatedSource, {
+          signal: controller.signal,
+        });
+
+      if (
+        controller.signal.aborted ||
+        !isMountedRef.current
+      ) {
+        return;
+      }
 
       if (!previewSuccessful) {
         throw new Error(
@@ -592,6 +711,15 @@ export default function GeneratedCodePreview({
         );
       }
     } catch (generationError) {
+      // Ignore intentional cancellation and unmounted components.
+      if (
+        controller.signal.aborted ||
+        generationError.name === "AbortError" ||
+        !isMountedRef.current
+      ) {
+        return;
+      }
+
       // Restore the editor if generation fails.
       setSource(previousSource);
 
@@ -610,7 +738,13 @@ export default function GeneratedCodePreview({
         }
       }
 
-      setIsGenerating(false);
+      if (activeControllerRef.current === controller) {
+        activeControllerRef.current = null;
+      }
+
+      if (isMountedRef.current) {
+        setIsGenerating(false);
+      }
     }
   }
 
