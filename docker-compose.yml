@@ -1,0 +1,21 @@
+services:
+  backend:
+    build: ./backend
+    environment:
+      PORT: 4000
+      CLIENT_ORIGIN: http://localhost:3000
+      AI_PROVIDER: ollama
+      OLLAMA_URL: http://host.docker.internal:11434/api/generate
+      OLLAMA_MODEL: llama3.2:3b
+    ports:
+      - "4000:4000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+  frontend:
+    build: ./frontend
+    environment:
+      NEXT_PUBLIC_SOCKET_URL: http://localhost:4000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend

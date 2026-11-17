@@ -1,0 +1,24 @@
+{
+  "name": "auragen-frontend",
+  "version": "2.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@babel/standalone": "^8.1.2",
+    "framer-motion": "^14.14.0",
+    "next": "^15.5.29",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "socket.io-client": "^4.8.1"
+  },
+  "devDependencies": {
+    "postcss": "^8.5.32"
+  },
+  "overrides": {
+    "postcss": "$postcss"
+  }
+}

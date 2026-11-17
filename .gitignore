@@ -1,0 +1,16 @@
+node_modules/
+.next/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+!.env.local.example
+.DS_Store
+*.log
+
+# Local code backup snapshots
+*.cache-backup
+*.cache-v2-backup
+*.performance-backup
+*.week4-backup
