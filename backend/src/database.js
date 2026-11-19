@@ -1,11 +1,39 @@
-
-import dns from "node:dns";
-import tls from "node:tls";
-import { MongoClient } from "mongodb";
+﻿import { MongoClient } from "mongodb";
 import { config } from "./config/environment.js";
 
 let client;
 let database;
+
+function getConnectionUri() {
+  const isDevelopmentAtlas =
+    config.nodeEnv === "development" &&
+    config.mongoUri.startsWith("mongodb+srv://");
+
+  if (!isDevelopmentAtlas) {
+    return config.mongoUri;
+  }
+
+  const originalUri = new URL(config.mongoUri);
+
+  // Use verified Atlas nodes to avoid Node.js SRV/TXT DNS failures.
+  const hosts = [
+    "ac-rpdnotn-shard-00-00.cz37jbn.mongodb.net:27017",
+    "ac-rpdnotn-shard-00-01.cz37jbn.mongodb.net:27017",
+    "ac-rpdnotn-shard-00-02.cz37jbn.mongodb.net:27017",
+  ];
+
+  const credentials = originalUri.username
+    ? `${originalUri.username}${originalUri.password ? ":" + originalUri.password : ""}@`
+    : "";
+
+  const options = new URLSearchParams(originalUri.search);
+
+  options.set("authSource", "admin");
+  options.set("replicaSet", "atlas-dzva7k-shard-0");
+  options.set("tls", "true");
+
+  return `mongodb://${credentials}${hosts.join(",")}${originalUri.pathname || "/"}?${options.toString()}`;
+}
 
 export async function connectDatabase() {
   if (database) {
@@ -16,32 +44,14 @@ export async function connectDatabase() {
     throw new Error("MONGODB_URI is not configured.");
   }
 
-  const isDevelopmentAtlas =
-    config.nodeEnv === "development" &&
-    config.mongoUri.startsWith("mongodb+srv://");
+  const connectionUri = getConnectionUri();
 
-  // Windows development DNS configuration for MongoDB SRV.
-  if (isDevelopmentAtlas) {
-    dns.setServers(["8.8.8.8", "1.1.1.1"]);
-  }
-
-  // Explicit TLS 1.2 for the verified Windows/Atlas connection.
-  const tlsOptions = isDevelopmentAtlas
-    ? {
-        secureContext: tls.createSecureContext({
-          minVersion: "TLSv1.2",
-          maxVersion: "TLSv1.2",
-        }),
-      }
-    : {};
-
-  client = new MongoClient(config.mongoUri, {
+  client = new MongoClient(connectionUri, {
     serverSelectionTimeoutMS: 15000,
     connectTimeoutMS: 10000,
     socketTimeoutMS: 20000,
     retryReads: true,
     retryWrites: true,
-    ...tlsOptions,
   });
 
   try {
@@ -49,10 +59,8 @@ export async function connectDatabase() {
 
     database = client.db("auragen");
 
-    // Verify database connectivity.
     await database.command({ ping: 1 });
 
-    // Application indexes.
     await database.collection("applications").createIndex(
       { applicationId: 1 },
       { unique: true }
@@ -62,7 +70,6 @@ export async function connectDatabase() {
       { submittedAt: -1 }
     );
 
-    // Administrator session indexes.
     const sessions = database.collection("admin_sessions");
 
     await sessions.createIndex(
@@ -81,7 +88,6 @@ export async function connectDatabase() {
 
     return database;
   } catch (error) {
-    // Print useful diagnostics without exposing credentials.
     console.error("MongoDB connection diagnostic:", {
       name: error?.name || "UnknownError",
       code: error?.code || null,
