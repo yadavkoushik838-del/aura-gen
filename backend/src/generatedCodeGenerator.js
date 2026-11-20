@@ -21,12 +21,14 @@ const MAX_SOURCE_LENGTH = 20_000;
 const GENERATION_TIMEOUT_MS =
   Number(process.env.GENERATED_CODE_TIMEOUT_MS) || 30_000;
 
-const GENERATION_PROMPT_VERSION = "preview-v1";
+// Increment this version whenever the generation prompt changes.
+const GENERATION_PROMPT_VERSION = "preview-v2";
 
 const GENERATION_PROMPT = `
-Generate one complete React JSX component for AuraGen.
+Generate one complete, polished React JSX component for AuraGen,
+an adaptive financial application platform.
 
-Requirements:
+STRICT REQUIREMENTS:
 1. Return source code only. Do not use Markdown fences or explanations.
 2. Export exactly one default React function component named Preview.
 3. Import React only from "react", if an import is needed.
@@ -38,21 +40,85 @@ Requirements:
 6. Do not use browser APIs, external libraries, network requests,
    timers, dynamic imports, or external resources.
 7. Do not use JSX spread attributes, refs, or dangerouslySetInnerHTML.
-8. Use simple, readable JSX and static content.
+8. Use inline styles for all styling.
 9. Keep the complete source under 20,000 characters.
+10. Ensure all JSX tags and attributes are correctly formatted.
 
-Expected structure:
+DESIGN:
+Create a professional, modern financial application form.
+
+Visual style:
+- Clean white background.
+- Dark navy headings.
+- Blue accent colors.
+- Rounded cards and input fields.
+- Subtle shadows.
+- Generous spacing.
+- Consistent typography.
+- Clear visual hierarchy.
+- Responsive-looking layout.
+
+COMPONENT STRUCTURE:
+
+1. HEADER
+- AuraGen branding.
+- Small description: Adaptive UX Platform.
+
+2. MAIN SECTION
+- Heading: Financial Application.
+- Description: Complete your application in a few simple steps.
+- Progress indicator showing Step 1 of 3.
+
+3. PERSONAL INFORMATION CARD
+Include clearly labeled fields:
+- Full Name.
+- Email Address.
+- Phone Number.
+- Employment Status.
+- Annual Income.
+
+Use appropriate input types and helpful placeholder text.
+
+4. PRIVACY INFORMATION
+Display a short reassurance message explaining that applicant
+information is handled securely.
+
+5. PRIMARY ACTION
+- Prominent blue Continue button.
+- Clear visual hierarchy.
+- Comfortable spacing around the button.
+
+6. FOOTER
+- AuraGen branding.
+- Short application platform description.
+
+QUALITY REQUIREMENTS:
+- Every input must have a visible label.
+- Group related fields into attractive cards.
+- Use consistent spacing and typography.
+- Make the primary action visually prominent.
+- Avoid unnecessary decorative elements.
+- Do not generate generic demo cards.
+- Do not include "Example content".
+- Do not include fake statistics or dashboard metrics.
+- Generate a complete financial application interface.
+- Use readable, maintainable JSX.
+
+IMPORTANT:
+The component is a static preview. Do not implement form
+submission, event handlers, or interactive JavaScript.
+
+EXPECTED EXPORT:
+
 export default function Preview() {
   return (
     <div>
-      <h2>Generated interface</h2>
-      <p>Example content</p>
+      {/* Complete financial application interface */}
     </div>
   );
 }
 
-Generate a polished, responsive-looking interface using the
-permitted elements and simple inline styles.
+Return only the complete React JSX source code.
 `;
 
 function createGenerationCacheKey() {
