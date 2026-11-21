@@ -1,38 +1,23 @@
-﻿import { MongoClient } from "mongodb";
+﻿import dns from "node:dns";
+
+const dnsServers = (process.env.DNS_SERVERS || "")
+  .split(",")
+  .map((server) => server.trim())
+  .filter(Boolean);
+
+if (dnsServers.length > 0) {
+  dns.setServers(dnsServers);
+}
+import { MongoClient } from "mongodb";
 import { config } from "./config/environment.js";
 
 let client;
 let database;
 
 function getConnectionUri() {
-  const isDevelopmentAtlas =
-    config.nodeEnv === "development" &&
-    config.mongoUri.startsWith("mongodb+srv://");
-
-  if (!isDevelopmentAtlas) {
-    return config.mongoUri;
-  }
-
-  const originalUri = new URL(config.mongoUri);
-
-  // Use verified Atlas nodes to avoid Node.js SRV/TXT DNS failures.
-  const hosts = [
-    "ac-rpdnotn-shard-00-00.cz37jbn.mongodb.net:27017",
-    "ac-rpdnotn-shard-00-01.cz37jbn.mongodb.net:27017",
-    "ac-rpdnotn-shard-00-02.cz37jbn.mongodb.net:27017",
-  ];
-
-  const credentials = originalUri.username
-    ? `${originalUri.username}${originalUri.password ? ":" + originalUri.password : ""}@`
-    : "";
-
-  const options = new URLSearchParams(originalUri.search);
-
-  options.set("authSource", "admin");
-  options.set("replicaSet", "atlas-dzva7k-shard-0");
-  options.set("tls", "true");
-
-  return `mongodb://${credentials}${hosts.join(",")}${originalUri.pathname || "/"}?${options.toString()}`;
+  // Use the original MongoDB Atlas SRV connection URI.
+  // The MongoDB driver handles DNS discovery and replica-set selection.
+  return config.mongoUri;
 }
 
 export async function connectDatabase() {
@@ -59,8 +44,10 @@ export async function connectDatabase() {
 
     database = client.db("auragen");
 
+    // Verify MongoDB connectivity.
     await database.command({ ping: 1 });
 
+    // Applications collection indexes.
     await database.collection("applications").createIndex(
       { applicationId: 1 },
       { unique: true }
@@ -70,6 +57,7 @@ export async function connectDatabase() {
       { submittedAt: -1 }
     );
 
+    // Admin sessions collection indexes.
     const sessions = database.collection("admin_sessions");
 
     await sessions.createIndex(
