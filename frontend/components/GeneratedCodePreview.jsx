@@ -324,10 +324,7 @@ export default function GeneratedCodePreview({
   const [isValidating, setIsValidating] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // Track the active backend request.
   const activeControllerRef = useRef(null);
-
-  // Prevent state updates after component unmount.
   const isMountedRef = useRef(false);
 
   useEffect(() => {
@@ -352,8 +349,6 @@ export default function GeneratedCodePreview({
 
     const externalSignal = options.signal;
 
-    // Manual validation owns its controller.
-    // AI generation supplies its existing controller signal.
     const controller = externalSignal
       ? null
       : new AbortController();
@@ -377,7 +372,7 @@ export default function GeneratedCodePreview({
     }
 
     setError("");
-    setPreviewDocument("");
+    // Keep the previous successful preview visible during validation.
     setIsValidating(true);
     setStatus("Validating generated code with backend...");
 
@@ -455,6 +450,7 @@ export default function GeneratedCodePreview({
         throw new Error("Babel did not produce compiled code.");
       }
 
+      // Replace the old preview only after successful validation and compilation.
       setPreviewDocument(
         createSandboxDocument(result.code)
       );
@@ -473,8 +469,7 @@ export default function GeneratedCodePreview({
         return false;
       }
 
-      setPreviewDocument("");
-
+      // Keep the last successful preview if new code fails.
       setError(
         compileError.message ||
           "Generated code validation or compilation failed."
@@ -553,7 +548,6 @@ export default function GeneratedCodePreview({
 
       setStatus("Receiving JSX tokens from Ollama...");
 
-      // Process one complete NDJSON event.
       function processEventLine(line) {
         const trimmedLine = line.trim();
 
@@ -586,7 +580,6 @@ export default function GeneratedCodePreview({
             );
           }
 
-          // Display incoming source progressively.
           if (
             isMountedRef.current &&
             !controller.signal.aborted
@@ -609,7 +602,6 @@ export default function GeneratedCodePreview({
         }
       }
 
-      // Read the stream until the server closes it.
       while (true) {
         if (
           controller.signal.aborted ||
@@ -637,7 +629,6 @@ export default function GeneratedCodePreview({
 
         const lines = buffer.split("\n");
 
-        // Keep the unfinished line for the next chunk.
         buffer = lines.pop() || "";
 
         for (const line of lines) {
@@ -645,7 +636,6 @@ export default function GeneratedCodePreview({
         }
       }
 
-      // Flush the decoder and process the last event.
       buffer += decoder.decode();
 
       if (buffer.trim()) {
@@ -692,7 +682,6 @@ export default function GeneratedCodePreview({
         "AI generation complete. Starting security validation..."
       );
 
-      // STEP 3: Validate, compile and preview the complete source.
       const previewSuccessful =
         await compileAndPreview(generatedSource, {
           signal: controller.signal,
@@ -711,7 +700,6 @@ export default function GeneratedCodePreview({
         );
       }
     } catch (generationError) {
-      // Ignore intentional cancellation and unmounted components.
       if (
         controller.signal.aborted ||
         generationError.name === "AbortError" ||
@@ -720,7 +708,6 @@ export default function GeneratedCodePreview({
         return;
       }
 
-      // Restore the editor if generation fails.
       setSource(previousSource);
 
       setError(
@@ -748,7 +735,7 @@ export default function GeneratedCodePreview({
     }
   }
 
-  // STEP 4: User interface.
+  // STEP 3: User interface.
   return (
     <section
       style={{
