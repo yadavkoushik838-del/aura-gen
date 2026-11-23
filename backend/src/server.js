@@ -819,9 +819,27 @@ io.on("connection", (socket) => {
 // ==========================================
 
 async function startServer() {
+  let databaseStatus = "skipped";
+
   try {
     if (config.nodeEnv !== "test") {
-      await connectDatabase();
+      try {
+        await connectDatabase();
+        databaseStatus = "connected";
+      } catch (error) {
+        databaseStatus = "unavailable";
+
+        if (config.nodeEnv === "production") {
+          throw error;
+        }
+
+        logger.warn(
+          {
+            errorCode: error?.code || "DATABASE_UNAVAILABLE",
+          },
+          "MongoDB is unavailable. Starting the development server without database access."
+        );
+      }
     }
 
     await new Promise((resolve, reject) => {
@@ -848,7 +866,7 @@ async function startServer() {
         port,
         environment: config.nodeEnv,
         aiProvider: config.aiProvider,
-        database: "connected",
+        database: databaseStatus,
       },
       "AuraGen backend started"
     );
