@@ -308,3 +308,12 @@ test("generated code validation endpoint enforces its rate limit", async () => {
 
   assert.equal(lastResponse.status, 429);
 });
+test("readiness endpoint returns 503 when the database is unavailable", async () => {
+  const response = await fetch(`${BASE_URL}/ready`);
+  const body = await response.json();
+
+  assert.equal(response.status, 503);
+  assert.equal(body.status, "not_ready");
+  assert.equal(body.dependencies.database.status, "unavailable");
+  assert.ok(Number.isFinite(Date.parse(body.timestamp)));
+});
