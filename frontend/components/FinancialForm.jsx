@@ -63,7 +63,10 @@ export default function FinancialForm({
       return;
     }
 
-    if (Number(values.annualIncome) < 0) {
+    if (
+      !Number.isFinite(Number(values.annualIncome)) ||
+      Number(values.annualIncome) < 0
+    ) {
       onValidationError(1);
       return;
     }
@@ -73,16 +76,17 @@ export default function FinancialForm({
 
   if (step === "review") {
     return (
-      <section className="form-card">
+      <section className="form-card" aria-labelledby="review-heading">
         <div className="form-card-heading">
           <div>
             <span className="eyebrow">STEP 02 · REVIEW</span>
-            <h3>Review your application</h3>
+            <h3 id="review-heading">Review your application</h3>
             <p className="muted">
-              Check your information before submitting.
+              Check your information carefully before submitting.
             </p>
           </div>
-          <span className="form-tag">Review</span>
+
+          <span className="form-tag">Final review</span>
         </div>
 
         <div className="review-list">
@@ -110,7 +114,7 @@ export default function FinancialForm({
             onClick={onSubmit}
             disabled={submitting}
           >
-            {submitting ? "Submitting…" : "Submit application →"}
+            {submitting ? "Submitting..." : "Submit application →"}
           </button>
         </div>
       </section>
@@ -118,13 +122,19 @@ export default function FinancialForm({
   }
 
   return (
-    <form onSubmit={validateAndContinue} className="form-grid" noValidate>
+    <form
+      onSubmit={validateAndContinue}
+      className="form-grid"
+      noValidate
+      aria-label="Financial application details"
+    >
       {fields.map((field) => (
         <label className="field" key={field.name}>
           <span>{field.label}</span>
 
           {field.type === "select" ? (
             <select
+              name={field.name}
               required
               value={values[field.name] || ""}
               onChange={(event) =>
@@ -132,12 +142,16 @@ export default function FinancialForm({
               }
             >
               <option value="">Select an option</option>
+
               {field.options.map((option) => (
-                <option key={option}>{option}</option>
+                <option key={option} value={option}>
+                  {option}
+                </option>
               ))}
             </select>
           ) : (
             <input
+              name={field.name}
               type={field.type}
               required
               min={field.type === "number" ? "0" : undefined}

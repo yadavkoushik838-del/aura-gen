@@ -1,4 +1,4 @@
-﻿
+
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -90,6 +90,7 @@ export default function Home() {
   const [automaticTestPending, setAutomaticTestPending] = useState(false);
 
   const manualRequestLock = useRef(false);
+  const submissionLock = useRef(false);
   const manualRequestTimeout = useRef(null);
   const automaticTestTimeout = useRef(null);
 
@@ -391,9 +392,9 @@ export default function Home() {
     setContextValidationErrors(safeErrorCount);
 
     socket?.emit("telemetry", {
-      validationErrors: count,
+      validationErrors: safeErrorCount,
       completedFieldCount: Object.values(values).filter(
-        (value) => String(value).trim()
+        (value) => String(value ?? "").trim().length > 0
       ).length,
     });
 
@@ -499,8 +500,9 @@ export default function Home() {
   }
 
   async function submitApplication() {
-    if (submitting) return;
+    if (submissionLock.current || submitting) return;
 
+    submissionLock.current = true;
     setSubmitting(true);
     setNotice("Submitting your application...");
 
@@ -547,6 +549,7 @@ export default function Home() {
         "warning"
       );
     } finally {
+      submissionLock.current = false;
       setSubmitting(false);
     }
   }
@@ -1052,6 +1055,8 @@ export default function Home() {
         <button
           className="button button-quiet"
           onClick={resetDemo}
+          disabled={submitting}
+          aria-label={submitting ? "Cannot reset while submitting an application" : "Reset demo"}
         >
           Reset demo
         </button>
@@ -1116,9 +1121,10 @@ export default function Home() {
               </div>
 
               <p className="muted">
-                Demo privacy note: this prototype validates the details
-                and returns a receipt, but does not save applicant
-                information to a database.
+                Privacy note: Submitting this application stores your name,
+                email, employment status, and annual income in MongoDB for
+                application review. Use demo information rather than real
+                personal or financial details.
               </p>
 
               <button
