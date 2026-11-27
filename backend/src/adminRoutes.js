@@ -48,7 +48,7 @@ function getSessionToken(req) {
   return null;
 }
 
-function setSessionCookie(res, token) {
+function setSessionCookie(res, token, nodeEnv) {
   const parts = [
     `${COOKIE_NAME}=${encodeURIComponent(token)}`,
     "HttpOnly",
@@ -57,14 +57,14 @@ function setSessionCookie(res, token) {
     `Max-Age=${SESSION_MAX_AGE_SECONDS}`,
   ];
 
-  if (config.nodeEnv === "production") {
+  if (nodeEnv === "production") {
     parts.push("Secure");
   }
 
   res.setHeader("Set-Cookie", parts.join("; "));
 }
 
-function clearSessionCookie(res) {
+function clearSessionCookie(res, nodeEnv) {
   const parts = [
     `${COOKIE_NAME}=`,
     "HttpOnly",
@@ -73,7 +73,7 @@ function clearSessionCookie(res) {
     "Max-Age=0",
   ];
 
-  if (config.nodeEnv === "production") {
+  if (nodeEnv === "production") {
     parts.push("Secure");
   }
 
@@ -83,6 +83,13 @@ function clearSessionCookie(res) {
 export function createAdminRouter({
   isAllowedOrigin,
   logger,
+
+  // Optional dependencies for isolated testing.
+  adminConfig = config,
+  createSession = createAdminSession,
+  findSession = findAdminSession,
+  revokeSession = revokeAdminSession,
+  getApplications = getApplicationsCollection,
 }) {
   const router = express.Router();
 
@@ -116,8 +123,8 @@ export function createAdminRouter({
   router.post("/login", loginLimiter, async (req, res, next) => {
     try {
       if (
-        !config.adminUsername ||
-        !config.adminPasswordHash
+        !adminConfig.adminUsername ||
+        !adminConfig.adminPasswordHash
       ) {
         return res.status(503).json({
           status: "error",
@@ -142,14 +149,13 @@ export function createAdminRouter({
         });
       }
 
-      // Verify the password even when the username is incorrect.
       const passwordMatches = await verifyAdminPassword(
         password,
-        config.adminPasswordHash
+        adminConfig.adminPasswordHash
       );
 
       if (
-        username !== config.adminUsername ||
+        username !== adminConfig.adminUsername ||
         !passwordMatches
       ) {
         logAuditEvent(logger, "ADMIN_LOGIN_FAILED");
@@ -160,17 +166,21 @@ export function createAdminRouter({
         });
       }
 
-      const session = await createAdminSession(
-        config.adminUsername
+      const session = await createSession(
+        adminConfig.adminUsername
       );
 
-      setSessionCookie(res, session.token);
+      setSessionCookie(
+        res,
+        session.token,
+        adminConfig.nodeEnv
+      );
 
       logAuditEvent(logger, "ADMIN_LOGIN_SUCCEEDED");
 
       return res.status(200).json({
         status: "authenticated",
-        username: config.adminUsername,
+        username: adminConfig.adminUsername,
         expiresAt: session.expiresAt.toISOString(),
       });
     } catch (error) {
@@ -182,7 +192,7 @@ export function createAdminRouter({
   async function requireAdmin(req, res, next) {
     try {
       const token = getSessionToken(req);
-      const session = await findAdminSession(token);
+      const session = await findSession(token);
 
       if (!session) {
         logAuditEvent(logger, "ADMIN_SESSION_REJECTED");
@@ -216,14 +226,14 @@ export function createAdminRouter({
       const token = getSessionToken(req);
 
       if (token) {
-        const revoked = await revokeAdminSession(token);
+        const revoked = await revokeSession(token);
 
         if (revoked) {
           logAuditEvent(logger, "ADMIN_LOGOUT");
         }
       }
 
-      clearSessionCookie(res);
+      clearSessionCookie(res, adminConfig.nodeEnv);
 
       return res.status(200).json({
         status: "logged_out",
@@ -257,7 +267,7 @@ export function createAdminRouter({
           });
         }
 
-        const applications = getApplicationsCollection();
+        const applications = getApplications();
 
         const [items, total] = await Promise.all([
           applications
