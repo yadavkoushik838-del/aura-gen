@@ -120,3 +120,49 @@ test("returns false when revoking an unknown session", async () => {
 
   assert.equal(result, false);
 });
+test("rejects an expired session even when its record still exists", async () => {
+  const collection = createMockCollection();
+
+  const created = await createAdminSession(
+    "admin",
+    collection
+  );
+
+  const storedDocument = [...collection.documents.values()][0];
+
+  // Simulate an expired database record.
+  storedDocument.expiresAt = new Date(Date.now() - 1000);
+
+  assert.equal(
+    await findAdminSession(created.token, collection),
+    null
+  );
+});
+
+test("rejects malformed tokens without accessing the database", async () => {
+  let databaseCalls = 0;
+
+  const collection = {
+    async findOne() {
+      databaseCalls++;
+      return null;
+    },
+
+    async deleteOne() {
+      databaseCalls++;
+      return { deletedCount: 0 };
+    },
+  };
+
+  assert.equal(
+    await findAdminSession("invalid-token", collection),
+    null
+  );
+
+  assert.equal(
+    await revokeAdminSession("invalid-token", collection),
+    false
+  );
+
+  assert.equal(databaseCalls, 0);
+});
