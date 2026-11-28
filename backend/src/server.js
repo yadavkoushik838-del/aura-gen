@@ -154,6 +154,12 @@ app.use(express.json({ limit: "20kb" }));
 const io = new Server(httpServer, {
   cors: corsOptions,
   maxHttpBufferSize: 1e5,
+
+  allowRequest: (req, callback) => {
+    const origin = req.headers.origin;
+
+    callback(null, isAllowedOrigin(origin));
+  },
 });
 
 // ==========================================

@@ -1,6 +1,8 @@
+
 import { spawn } from "node:child_process";
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
+import { io as createSocket } from "socket.io-client";
 
 const PORT = 4101;
 const BASE_URL = `http://127.0.0.1:${PORT}`;
@@ -14,10 +16,10 @@ let server;
 before(async () => {
   server = spawn("node", ["src/server.js"], {
     env: {
-  ...process.env,
-  NODE_ENV: "test",
-  PORT: String(PORT),
-},
+      ...process.env,
+      NODE_ENV: "test",
+      PORT: String(PORT),
+    },
     stdio: "ignore",
   });
 
@@ -77,6 +79,7 @@ test("security headers are returned by the backend", async () => {
     "SAMEORIGIN"
   );
 });
+
 // ==========================================
 // REQUEST ID TRACKING
 // ==========================================
@@ -91,17 +94,14 @@ test("each request receives a unique request ID", async () => {
   const secondRequestId =
     secondResponse.headers.get("x-request-id");
 
-  // Every response must contain a request ID.
   assert.ok(firstRequestId);
   assert.ok(secondRequestId);
 
-  // Verify that request IDs follow UUID format.
   assert.match(
     firstRequestId,
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
   );
 
-  // Each request must receive a different ID.
   assert.notEqual(
     firstRequestId,
     secondRequestId
@@ -130,6 +130,7 @@ test("application endpoint enforces its rate limit", async () => {
 
   assert.equal(lastResponse.status, 429);
 });
+
 // ==========================================
 // NOT FOUND ERROR HANDLING
 // ==========================================
@@ -300,7 +301,8 @@ test("generated code validation endpoint enforces its rate limit", async () => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          source: "export default function Preview(){ return <div>Hello</div>; }",
+          source:
+            "export default function Preview(){ return <div>Hello</div>; }",
         }),
       }
     );
@@ -308,6 +310,11 @@ test("generated code validation endpoint enforces its rate limit", async () => {
 
   assert.equal(lastResponse.status, 429);
 });
+
+// ==========================================
+// READINESS CHECK
+// ==========================================
+
 test("readiness endpoint returns 503 when the database is unavailable", async () => {
   const response = await fetch(`${BASE_URL}/ready`);
   const body = await response.json();
@@ -316,4 +323,90 @@ test("readiness endpoint returns 503 when the database is unavailable", async ()
   assert.equal(body.status, "not_ready");
   assert.equal(body.dependencies.database.status, "unavailable");
   assert.ok(Number.isFinite(Date.parse(body.timestamp)));
+});
+
+// ==========================================
+// SOCKET.IO TEST HELPER
+// ==========================================
+
+function connectTestSocket({
+  origin,
+  transport = "websocket",
+} = {}) {
+  return new Promise((resolve) => {
+    const options = {
+      transports: [transport],
+      reconnection: false,
+      timeout: 3000,
+    };
+
+    if (origin) {
+      options.extraHeaders = {
+        Origin: origin,
+      };
+    }
+
+    const socket = createSocket(BASE_URL, options);
+
+    socket.once("connect", () => {
+      socket.close();
+      resolve({ connected: true });
+    });
+
+    socket.once("connect_error", (error) => {
+      socket.close();
+      resolve({
+        connected: false,
+        error,
+      });
+    });
+  });
+}
+
+// ==========================================
+// SOCKET.IO ORIGIN SECURITY
+// ==========================================
+
+test("Socket.IO accepts an allowed localhost WebSocket origin", async () => {
+  const result = await connectTestSocket({
+    origin: "http://localhost:3000",
+    transport: "websocket",
+  });
+
+  assert.equal(result.connected, true);
+});
+
+test("Socket.IO rejects a non-localhost unconfigured WebSocket origin", async () => {
+  const result = await connectTestSocket({
+    origin: "https://untrusted.example",
+    transport: "websocket",
+  });
+
+  assert.equal(result.connected, false);
+});
+
+test("Socket.IO accepts connections without an Origin header", async () => {
+  const result = await connectTestSocket({
+    transport: "websocket",
+  });
+
+  assert.equal(result.connected, true);
+});
+
+test("Socket.IO accepts an allowed polling origin", async () => {
+  const result = await connectTestSocket({
+    origin: "http://localhost:3000",
+    transport: "polling",
+  });
+
+  assert.equal(result.connected, true);
+});
+
+test("Socket.IO rejects a non-localhost unconfigured polling origin", async () => {
+  const result = await connectTestSocket({
+    origin: "https://untrusted.example",
+    transport: "polling",
+  });
+
+  assert.equal(result.connected, false);
 });
