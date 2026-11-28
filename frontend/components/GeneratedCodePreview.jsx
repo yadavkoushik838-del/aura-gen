@@ -25,7 +25,7 @@ export default function Preview() {
 
 const ALLOWED_TAGS = [
   "div", "span", "p", "h1", "h2", "h3", "h4",
-  "section", "article", "header", "footer",
+  "section", "article", "header", "main", "footer",
   "strong", "em", "small", "ul", "ol", "li",
   "button", "label", "input", "img", "hr", "br",
 ];

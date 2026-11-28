@@ -19,7 +19,7 @@ const OLLAMA_MODEL =
 const MAX_SOURCE_LENGTH = 20_000;
 
 const GENERATION_TIMEOUT_MS =
-  Number(process.env.GENERATED_CODE_TIMEOUT_MS) || 30_000;
+  Number(process.env.GENERATED_CODE_TIMEOUT_MS) || 90_000;
 
 // Increment this version whenever the generation prompt changes.
 const GENERATION_PROMPT_VERSION = "preview-v2";
@@ -238,7 +238,7 @@ export async function* generateCodeStream({ signal } = {}) {
       keep_alive: "10m",
       options: {
         temperature: 0.2,
-        num_predict: 800,
+        num_predict: 2000,
       },
     }),
     signal: requestSignal,
