@@ -352,7 +352,22 @@ test("admin can retrieve paginated applications", async () => {
     totalPages: 2,
   });
 
+   const allowedFields = [
+    "applicationId",
+    "fullName",
+    "email",
+    "employment",
+    "annualIncome",
+    "submittedAt",
+    "status",
+  ];
+
   for (const application of body.applications) {
+    assert.deepEqual(
+      Object.keys(application).sort(),
+      [...allowedFields].sort()
+    );
+
     assert.equal("_id" in application, false);
   }
 });
