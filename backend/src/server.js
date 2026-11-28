@@ -1,4 +1,3 @@
-
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
@@ -43,6 +42,7 @@ import {
 } from "./errorHandler.js";
 
 import { config } from "./config/environment.js";
+import { isOriginAllowed } from "./security/originPolicy.js";
 
 import {
   connectDatabase,
@@ -90,24 +90,11 @@ const configuredOrigins =
         "http://localhost:3001",
       ];
 
-const isAllowedOrigin = (origin) => {
-  if (!origin) {
-    return true;
-  }
-
-  if (configuredOrigins.includes(origin)) {
-    return true;
-  }
-
-  if (config.nodeEnv === "production") {
-    return false;
-  }
-
-  return (
-    /^https?:\/\/localhost:\d+$/.test(origin) ||
-    /^https?:\/\/127\.0\.0\.1:\d+$/.test(origin)
-  );
-};
+const isAllowedOrigin = (origin) =>
+  isOriginAllowed(origin, {
+    nodeEnv: config.nodeEnv,
+    configuredOrigins,
+  });
 
 const corsOptions = {
   origin: (origin, callback) => {
