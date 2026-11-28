@@ -410,3 +410,29 @@ test("Socket.IO rejects a non-localhost unconfigured polling origin", async () =
 
   assert.equal(result.connected, false);
 });
+// ==========================================
+// JSON BODY SIZE LIMIT
+// ==========================================
+
+test("JSON body exceeding 20kb returns a JSON 413 response", async () => {
+  const response = await fetch(
+    `${BASE_URL}/api/applications`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        payload: "A".repeat(21 * 1024),
+      }),
+    }
+  );
+
+  const body = await response.json();
+
+  assert.equal(response.status, 413);
+  assert.equal(body.status, "error");
+  assert.equal(body.code, "REQUEST_FAILED");
+  assert.ok(body.message);
+  assert.ok(body.requestId);
+});
