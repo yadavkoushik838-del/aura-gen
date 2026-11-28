@@ -35,9 +35,13 @@ export function validateApplication(input) {
       ? input.employment.trim()
       : "";
 
-  const annualIncome = String(
-    input.annualIncome ?? ""
-  ).trim();
+  // Accept only string or numeric income values.
+  // Reject arrays, objects, booleans and null.
+  const annualIncome =
+    typeof input.annualIncome === "string" ||
+    typeof input.annualIncome === "number"
+      ? String(input.annualIncome).trim()
+      : "";
 
   // Name validation.
   if (fullName.length < 2 || fullName.length > 100) {

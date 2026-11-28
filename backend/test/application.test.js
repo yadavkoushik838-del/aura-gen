@@ -92,3 +92,20 @@ test("rejects malformed request bodies", () => {
     assert.equal(validateApplication(input).valid, false);
   }
 });
+test("rejects non-primitive annual income values", () => {
+  for (const annualIncome of [
+    ["600000"],
+    [],
+    { value: "600000" },
+    true,
+    false,
+  ]) {
+    assert.equal(
+      validateApplication({
+        ...validApplication,
+        annualIncome,
+      }).valid,
+      false
+    );
+  }
+});
